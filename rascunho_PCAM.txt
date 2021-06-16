@@ -1,0 +1,15 @@
+Rascunho para o PCAM do Trabalho 1 CAD:
+Particionamento: seria quebrar o problema em pedaços pequenos, ou seja:
+1º) Contar a ocorrência de cada letra;
+2º)Contabilizar a contagem;
+3º)Imprimir o valor da tabela ASCII de caracteres encontrados;
+Particionamento de tarefas de 1º a 3º.
+
+Comunicação: Definição de quais partes irão se comunicar.
+Comunicação entre as partes 1o, 2o , neste caso, teremos comunicação local. A 3º pode ocorrer depois.
+Para realizar a tarefa na 2 precisaremos das informações da 1.Com isso, poderemos partir para a 3º.
+
+Aglomeração: Redução drástica de tarefas para uma. Estou em dúvida aqui.
+
+Mapeamento: Definição onde cada tarefa será realizada. Teremos o escalonamento de tarefas.
+Continua...
