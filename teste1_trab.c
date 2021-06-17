@@ -41,6 +41,9 @@ void main ()
         k = 0;
         // Função memset preenche um bloco de memória com um conteúdo especificado
         // No parâmetro;
+       /*
+       PENSANDO EM INSERIR PARALLEL AQUI:
+       */
         memset(foivisto, false, sizeof(foivisto));
         
         
@@ -85,6 +88,9 @@ void main ()
         }
 
         // Ordena primeiro por caractere, depois por frequência;
+       /*
+       PENSANDO EM INSERIR PARALLEL AQUI:
+       */
         quickSort(caractere, k);
         insertionSort(caractere, k);
 
