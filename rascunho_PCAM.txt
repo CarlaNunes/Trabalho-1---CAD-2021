@@ -1,3 +1,4 @@
+Obs: A versão "completa" está nos links abaixo.
 Rascunho para o PCAM do Trabalho 1 CAD:
 Particionamento: seria quebrar o problema em pedaços pequenos, ou seja:
 1º) Contar a ocorrência de cada letra;
