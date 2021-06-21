@@ -3,7 +3,6 @@
 #include <string.h>
 #include<omp.h>
 
-#define T 8
 #define NUM_CHARS 256
 #define LINE_LEN 1001
 #define TEST_CASES 11000
@@ -13,28 +12,44 @@ typedef struct element {
   int count;
 } element_t;
 
-int compare(const void *a, const void *b) {
-  element_t *element_a = (element_t *) a;
-  element_t *element_b = (element_t *) b;
-
-  if (element_a->count == element_b->count) return element_b->code - element_a->code;
-  return element_a->count - element_b->count;
-}
-
 void count_characters(const char *line, element_t *count_map) {
   size_t len = strlen(line);
 
-  for (int i = 0; i < NUM_CHARS; i++) {
+  for (int i = 32; i <= 127; i++) {
     element_t *new_element = malloc(sizeof(element_t));
     new_element->code = i;
     new_element->count = 0;
     count_map[i] = *new_element;
   }
 
-  // podemos paralelizar como no exemplo dele sem reduction
   for (int i = 0; i < len; i++) {
     int char_code = (unsigned char) line[i];
     count_map[char_code].count = count_map[char_code].count + 1;
+  }
+}
+
+
+void counting_sort(element_t *array, int begin, int size) {
+  element_t ordered[size];
+  unsigned int counting[NUM_CHARS];
+
+  memset(counting, 0, sizeof(counting));
+
+  for (int i = begin; i < begin + size; i++) {
+    counting[array[i].count] += 1;
+  }
+
+  for (int i = 1; i <= NUM_CHARS; i++) {
+    counting[i] += counting[i - 1];
+  }
+
+  for (int i = begin; i < begin + size; i++) {
+    ordered[counting[array[i].count] - 1] = array[i];
+    counting[array[i].count]--;
+  }
+
+  for (int i = begin, j = 0; i < begin + size && j < size; i++, j++) {
+    array[i] = ordered[j];
   }
 }
 
@@ -56,11 +71,10 @@ int main() {
   }
 
   wtime = omp_get_wtime();
-  // podemos paralizar
 
   for (int i = 0; i < count; i++) {
     count_characters(input[i], occurrences_map[i]);
-    qsort(occurrences_map[i], NUM_CHARS, sizeof(element_t), compare);
+    counting_sort(occurrences_map[i], 0, NUM_CHARS);
   }
   wtime = omp_get_wtime() - wtime;
 

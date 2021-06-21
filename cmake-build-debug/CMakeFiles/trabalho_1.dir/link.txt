@@ -1,0 +1,1 @@
+/usr/local/Cellar/gcc/10.2.0_4/bin/gcc-10  -fopenmp -fopenmp -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX11.3.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/trabalho_1.dir/seq.c.o  -o trabalho_1 

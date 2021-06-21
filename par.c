@@ -3,71 +3,67 @@
 #include <string.h>
 #include<omp.h>
 
-#define T 8
+#define T 16
 #define NUM_CHARS 256
 #define LINE_LEN 1001
-#define TEST_CASES 11000
+#define TEST_CASES 11000 // quantidade de testes que serão rodados
 
 typedef struct element {
   int code;
   long long count;
 } element_t;
 
-int compare(const void *a, const void *b) {
-  element_t *element_a = (element_t *) a;
-  element_t *element_b = (element_t *) b;
+void counting_sort(element_t *array, int begin, int size) {
+  element_t ordered[size];
+  unsigned int counting[NUM_CHARS];
 
-  if (element_a->count == element_b->count) return element_b->code - element_a->code;
-  return element_a->count - element_b->count;
+  memset(counting, 0, sizeof(counting));
+
+  for (int i = begin; i < begin + size; i++) {
+    counting[array[i].count] += 1;
+  }
+
+  for (int i = 1; i <= NUM_CHARS; i++) {
+    counting[i] += counting[i - 1];
+  }
+
+  for (int i = begin; i < begin + size; i++) {
+    ordered[counting[array[i].count] - 1] = array[i];
+    counting[array[i].count]--;
+  }
+
+  for (int i = begin, j = 0; i < begin + size && j < size; i++, j++) {
+    array[i] = ordered[j];
+  }
 }
 
 void count_characters(const char *line, int line_number, long long **global_count, element_t *occurrences_map) {
-  long long local_count[NUM_CHARS], i;
+  long long local_count[NUM_CHARS];
+  int i;
   size_t len = strlen(line);
 
-//  #pragma omp parallel for num_threads(T)
-//  for (int i = 0; i < NUM_CHARS; i++) {
-//    element_t *new_element = malloc(sizeof(element_t));
-//    new_element->code = i;
-//    new_element->count = 0;
-//    count_map[i] = *new_element;
-//  }
-
-  omp_lock_t count_lock[NUM_CHARS];
-
-  #pragma omp parallel for private(i) num_threads(T) shared(global_count, local_count)
   for (i = 0; i < NUM_CHARS; i++) {
-    omp_init_lock(&count_lock[i]);
     local_count[i] = global_count[line_number][i] = 0;
   }
 
-  #pragma omp parallel num_threads(T) private(i) firstprivate(local_count) shared(global_count)
-  {
-    #pragma omp for
-    for (i = 0; i < len; i++) {
-      int char_code = (unsigned char) line[i];
-      local_count[char_code] += 1;
-    }
-
-    for (i = 0; i < NUM_CHARS; i++) {
-      omp_set_lock(&count_lock[i]);
-      global_count[line_number][i] += local_count[i];
-      omp_unset_lock(&count_lock[i]);
-    }
-    #pragma omp barrier
+  for (i = 0; i < len; i++) {
+    int char_code = (unsigned char) line[i];
+    local_count[char_code] += 1;
   }
 
-  // joga pra uma estretura de dados que vai ordenar
-  #pragma omp parallel for private(i) shared(occurrences_map)
-  for (int i = 0; i < NUM_CHARS; i++) {
-    if (global_count[line_number][i] > 0)  {
+  for (i = 32; i <= 127; i++) {
+    global_count[line_number][i] += local_count[i];
+  }
+
+  for (i = 32; i <= 127; i++) {
+    if (global_count[line_number][i] > 0) {
       element_t *new_element = malloc(sizeof(element_t));
       new_element->code = i;
       new_element->count = global_count[line_number][i];
       occurrences_map[i] = *new_element;
+
     }
   }
-
 }
 
 int main() {
@@ -91,11 +87,10 @@ int main() {
   }
 
   wtime = omp_get_wtime();
-  // podemos paralizar
   #pragma omp parallel for num_threads(T) shared(global_count, occurrences_map)
   for (int i = 0; i < count; i++) {
     count_characters(input[i], i, global_count, occurrences_map[i]);
-    qsort(occurrences_map[i], NUM_CHARS, sizeof(element_t), compare);
+    counting_sort(occurrences_map[i], 0, NUM_CHARS);
   }
   wtime = omp_get_wtime() - wtime;
 
@@ -109,7 +104,7 @@ int main() {
 
 
   free(buffer);
-  for(int i = 0; i < TEST_CASES; i++) {
+  for (int i = 0; i < TEST_CASES; i++) {
     free(input[i]);
     free(occurrences_map[i]);
   }

@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/gsasouza/study/alto_desempenho/Trabalho-1---CAD-2021/seq.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+omp.h
+-
+
