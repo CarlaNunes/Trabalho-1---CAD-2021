@@ -85,10 +85,6 @@ int main() {
   char *input;
   int rank, comm_size, count = 0, chunk_size;
   double wtime;
-  // create datatype for string array
-  MPI_Datatype string_dt;
-  MPI_Type_vector(LINE_LEN, 1, LINE_LEN, MPI_CHAR, &string_dt);
-  MPI_Type_commit(&string_dt);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
