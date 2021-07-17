@@ -1,3 +1,12 @@
+/*
+Autores:
+Caio Augusto Duarte Basso    10801173
+Carla Nunes da Cruz          8479343
+Gabriel Garcia Lorencetti    10691891
+Gabriel Santos SouzaGiovana  11208176 
+Daniele da SilvaNúmero       10692224
+*/
+
 #include<stdio.h>
 #include<stdlib.h>
 #include <string.h>
