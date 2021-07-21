@@ -92,14 +92,18 @@ char *read_input(int *count) {
 int main() {
   MPI_Init(NULL, NULL);
   char *input;
+  element_t *occurrences_map;
   int rank, comm_size, count = 0, chunk_size;
   double wtime;
+  // create datatype for string array
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
   // use rank 0 as master and calculate input
   if (rank == 0) {
     input = read_input(&count);
+    // allocate results array;
+   occurrences_map = malloc(sizeof(element_t) * count * NUM_CHARS);
     // calculate input in chunks so we can send to each process
     chunk_size = floor(count / comm_size);
   }
@@ -114,28 +118,41 @@ int main() {
   MPI_Scatter(input, chunk_size * LINE_LEN, MPI_CHAR, input_subset,
               chunk_size * LINE_LEN, MPI_CHAR, 0, MPI_COMM_WORLD);
 
-  // allocate results matrix
-  element_t **occurrences_map = malloc(sizeof(element_t *) * chunk_size);
-  for (int i = 0; i < chunk_size; i++) occurrences_map[i] = malloc(sizeof(element_t) * LINE_LEN);
+  // allocate results for each node
+  element_t *occurrences_map_subset = malloc(sizeof(element_t) * chunk_size * NUM_CHARS);
 
   // parallelize for each line
-  #pragma omp parallel for num_threads(T) shared(occurrences_map, input_subset)
+//  #pragma omp parallel for num_threads(T) shared(occurrences_map, input_subset)
   for (int i = 0; i < chunk_size; i++) {
-    count_characters(&input_subset[i * LINE_LEN], occurrences_map[i]);
-    counting_sort(occurrences_map[i], 0, NUM_CHARS);
-  }
-  if (rank == 0) {
-    wtime = omp_get_wtime() - wtime;
-    printf("wtime: %lf", wtime);
+    count_characters(&input_subset[i * LINE_LEN], &occurrences_map_subset[i * NUM_CHARS]);
+    counting_sort(&occurrences_map_subset[i * NUM_CHARS], 0, NUM_CHARS);
   }
 
-//  for (int i = 0; i < chunk_size; i++) {
-//    for (int j = 0; j < NUM_CHARS; j++) {
-//      if (occurrences_map[i][j].count > 0)
-//        printf("%d - %lld \n", occurrences_map[i][j].code, occurrences_map[i][j].count);
-//    }
-//    printf("\n");
-//  }
+  // send data back to root
+  MPI_Gather(occurrences_map_subset,
+             sizeof(element_t) * chunk_size * NUM_CHARS,
+             MPI_BYTE,
+             occurrences_map,
+             sizeof(element_t) * chunk_size * NUM_CHARS,
+             MPI_BYTE,
+             0,
+             MPI_COMM_WORLD);
+  int printed = 0;
+  // print result in root
+  if (rank == 0) {
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < NUM_CHARS; j++) {
+        if (occurrences_map[(i * NUM_CHARS) + j].count > 0) {
+          printf("%d - %lld \n",occurrences_map[(i * NUM_CHARS) + j].code, occurrences_map[(i * NUM_CHARS) + j].count);
+          printed++;
+        }
+      }
+      // use this to adjust not equal divisions (when count / comm_size is not an integer)
+      if (printed != 0) printf("\n");
+      printed = 0;
+    }
+  }
+
   MPI_Finalize();
 
   return 0;
