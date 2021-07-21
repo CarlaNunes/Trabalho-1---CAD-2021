@@ -1,18 +1,23 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include <string.h>
-#include<omp.h>
+#include <math.h>
+#include <omp.h>
+#include <mpi.h>
 
-#define T 16
+#define T 8
 #define NUM_CHARS 256
 #define LINE_LEN 1001
-#define TEST_CASES 11000 // quantidade de testes que serão rodados
+#define TEST_CASES 11000
 
 typedef struct element {
   int code;
   long long count;
 } element_t;
 
+/*
+ * O(n) sort
+ */
 void counting_sort(element_t *array, int begin, int size) {
   element_t ordered[size];
   unsigned int counting[NUM_CHARS];
@@ -37,13 +42,15 @@ void counting_sort(element_t *array, int begin, int size) {
   }
 }
 
-void count_characters(const char *line, int line_number, long long **global_count, element_t *occurrences_map) {
-  long long local_count[NUM_CHARS];
-  int i;
+/*
+ * We could parallelize here, but it need a nested parallelism, which didn't performed well in our tests using a small number of processors
+ */
+void count_characters(char *line, element_t *occurrences_map) {
+  long long local_count[NUM_CHARS], i;
   size_t len = strlen(line);
 
   for (i = 0; i < NUM_CHARS; i++) {
-    local_count[i] = global_count[line_number][i] = 0;
+    local_count[i] = 0;
   }
 
   for (i = 0; i < len; i++) {
@@ -51,65 +58,93 @@ void count_characters(const char *line, int line_number, long long **global_coun
     local_count[char_code] += 1;
   }
 
-  for (i = 32; i <= 127; i++) {
-    global_count[line_number][i] += local_count[i];
-  }
-
-  for (i = 32; i <= 127; i++) {
-    if (global_count[line_number][i] > 0) {
+  for (int i = 0; i < NUM_CHARS; i++) {
+    if (local_count[i] > 0)  {
       element_t *new_element = malloc(sizeof(element_t));
       new_element->code = i;
-      new_element->count = global_count[line_number][i];
+      new_element->count = local_count[i];
       occurrences_map[i] = *new_element;
-
     }
   }
 }
 
-int main() {
-  char *buffer = malloc(sizeof(char) * LINE_LEN);
-  char **input = malloc(sizeof(char *) * TEST_CASES);
-  for (int i = 0; i < TEST_CASES; i++) input[i] = malloc(sizeof(char) * LINE_LEN);
+char *read_input(int *count) {
+  char *input = malloc(sizeof(char) * TEST_CASES * LINE_LEN);
 
-  element_t **occurrences_map = malloc(sizeof(element_t *) * TEST_CASES);
-  for (int i = 0; i < TEST_CASES; i++) occurrences_map[i] = malloc(sizeof(element_t) * LINE_LEN);
-
-  long long **global_count = malloc(sizeof(long long *) * TEST_CASES);
-  for (int i = 0; i < TEST_CASES; i++) global_count[i] = malloc(sizeof(long long) * LINE_LEN);
-
-  int count = 0;
-  double wtime;
-
-  // read_input
+  char buffer[LINE_LEN];
   while (scanf(" %[^\n]", buffer) != EOF) {
-    strcpy(input[count], buffer);
-    count++;
+    strcpy(&input[(*count) * LINE_LEN], buffer);
+    *count = *count + 1;
   }
+  input[(*count + 1) * LINE_LEN] = '\0';
+  return input;
+}
 
+int main() {
+  MPI_Init(NULL, NULL);
+  char *input;
+  element_t *occurrences_map;
+  int rank, comm_size, count = 0, chunk_size;
+  double wtime;
+  // create datatype for string array
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+
+  // use rank 0 as master and calculate input
+  if (rank == 0) {
+    input = read_input(&count);
+    // allocate results array;
+   occurrences_map = malloc(sizeof(element_t) * count * NUM_CHARS);
+    // calculate input in chunks so we can send to each process
+    chunk_size = floor(count / comm_size);
+  }
   wtime = omp_get_wtime();
-  #pragma omp parallel for num_threads(T) shared(global_count, occurrences_map)
-  for (int i = 0; i < count; i++) {
-    count_characters(input[i], i, global_count, occurrences_map[i]);
-    counting_sort(occurrences_map[i], 0, NUM_CHARS);
-  }
-  wtime = omp_get_wtime() - wtime;
+  /* broadcast calculated chunk size*/
+  MPI_Bcast(&chunk_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  for (int i = 0; i < count; i++) {
-    for (int j = 0; j < NUM_CHARS; j++) {
-      if (occurrences_map[i][j].count > 0)
-        printf("%d - %d \n", occurrences_map[i][j].code, occurrences_map[i][j].count);
+  // allocate in each process a subset of input array
+  char *input_subset = malloc(sizeof(char) * chunk_size * LINE_LEN);
+
+  // Scatter input to all process
+  MPI_Scatter(input, chunk_size * LINE_LEN, MPI_CHAR, input_subset,
+              chunk_size * LINE_LEN, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+  // allocate results for each node
+  element_t *occurrences_map_subset = malloc(sizeof(element_t) * chunk_size * NUM_CHARS);
+
+  // parallelize for each line
+//  #pragma omp parallel for num_threads(T) shared(occurrences_map, input_subset)
+  for (int i = 0; i < chunk_size; i++) {
+    count_characters(&input_subset[i * LINE_LEN], &occurrences_map_subset[i * NUM_CHARS]);
+    counting_sort(&occurrences_map_subset[i * NUM_CHARS], 0, NUM_CHARS);
+  }
+
+  // send data back to root
+  MPI_Gather(occurrences_map_subset,
+             sizeof(element_t) * chunk_size * NUM_CHARS,
+             MPI_BYTE,
+             occurrences_map,
+             sizeof(element_t) * chunk_size * NUM_CHARS,
+             MPI_BYTE,
+             0,
+             MPI_COMM_WORLD);
+  int printed = 0;
+  // print result in root
+  if (rank == 0) {
+    for (int i = 0; i < count; i++) {
+      for (int j = 0; j < NUM_CHARS; j++) {
+        if (occurrences_map[(i * NUM_CHARS) + j].count > 0) {
+          printf("%d - %lld \n",occurrences_map[(i * NUM_CHARS) + j].code, occurrences_map[(i * NUM_CHARS) + j].count);
+          printed++;
+        }
+      }
+      // use this to adjust not equal divisions (when count / comm_size is not an integer)
+      if (printed != 0) printf("\n");
+      printed = 0;
     }
-    printf("\n");
   }
 
+  MPI_Finalize();
 
-  free(buffer);
-  for (int i = 0; i < TEST_CASES; i++) {
-    free(input[i]);
-    free(occurrences_map[i]);
-  }
-  free(input);
-  free(occurrences_map);
-  printf("wtime: %lf", wtime);
   return 0;
 }
