@@ -55,19 +55,19 @@ void counting_sort(element_t *array, int begin, int size) {
  * We could parallelize here, but it need a nested parallelism, which didn't performed well in our tests using a small number of processors
  */
 void count_characters(char *line, element_t *occurrences_map) {
-  long long local_count[NUM_CHARS], i;
+  long long local_count[NUM_CHARS];
   size_t len = strlen(line);
 
-  for (i = 0; i < NUM_CHARS; i++) {
+  for (int i = 32; i <= 127; i++) {
     local_count[i] = 0;
   }
 
-  for (i = 0; i < len; i++) {
+  for (int i = 0; i < len; i++) {
     int char_code = (unsigned char) line[i];
     local_count[char_code] += 1;
   }
 
-  for (int i = 0; i < NUM_CHARS; i++) {
+  for (int i = 32; i <= 127; i++) {
     if (local_count[i] > 0)  {
       element_t *new_element = malloc(sizeof(element_t));
       new_element->code = i;
@@ -103,7 +103,7 @@ int main() {
   if (rank == 0) {
     input = read_input(&count);
     // allocate results array;
-   occurrences_map = malloc(sizeof(element_t) * count * NUM_CHARS);
+    occurrences_map = malloc(sizeof(element_t) * count * NUM_CHARS);
     // calculate input in chunks so we can send to each process
     chunk_size = ceil(count / comm_size);
   }
