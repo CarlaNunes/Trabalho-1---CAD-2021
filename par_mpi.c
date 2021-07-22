@@ -105,8 +105,9 @@ int main() {
     // allocate results array;
    occurrences_map = malloc(sizeof(element_t) * count * NUM_CHARS);
     // calculate input in chunks so we can send to each process
-    chunk_size = floor(count / comm_size);
+    chunk_size = ceil(count / comm_size);
   }
+
   wtime = omp_get_wtime();
   /* broadcast calculated chunk size*/
   MPI_Bcast(&chunk_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -122,7 +123,7 @@ int main() {
   element_t *occurrences_map_subset = malloc(sizeof(element_t) * chunk_size * NUM_CHARS);
 
   // parallelize for each line
-//  #pragma omp parallel for num_threads(T) shared(occurrences_map, input_subset)
+  #pragma omp parallel for num_threads(T) shared(occurrences_map, input_subset)
   for (int i = 0; i < chunk_size; i++) {
     count_characters(&input_subset[i * LINE_LEN], &occurrences_map_subset[i * NUM_CHARS]);
     counting_sort(&occurrences_map_subset[i * NUM_CHARS], 0, NUM_CHARS);
@@ -137,6 +138,7 @@ int main() {
              MPI_BYTE,
              0,
              MPI_COMM_WORLD);
+
   int printed = 0;
   // print result in root
   if (rank == 0) {
